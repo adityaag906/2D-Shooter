@@ -1,15 +1,10 @@
-# 🎯 CYBER STRIKE 2D - Tactical 2D Action Shooter
-
-[![HTML5 Canvas](https://img.shields.io/badge/Engine-HTML5_Canvas-00f0ff?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
-[![Web Audio API](https://img.shields.io/badge/Audio-Web_Audio_API-00ff66?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-ff2a55?style=flat-square)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-ffb700?style=flat-square)](#)
+ CYBER STRIKE 2D - Tactical 2D Action Shooter
 
 **Cyber Strike 2D** is a lightweight, high-performance top-down 2D action arena shooter inspired by classic fast-paced action titles like *Hotline Miami*, *CS 2D*, and *Enter the Gungeon*. Built entirely with vanilla HTML5 Canvas, JavaScript ES6+, and Web Audio API synthesis with **zero external libraries or asset downloads**.
 
----
 
-## 🚀 Quick Start (Play Immediately)
+
+ Quick Start (Play Immediately)
 
 No installation or node setup required!
 
@@ -24,9 +19,9 @@ No installation or node setup required!
 
 ---
 
-## 🔥 Key Features
+ Key Features
 
-### 1. 🔫 Arsenal & Weapons
+1. Arsenal & Weapons
 - **P1-Tactical Pistol**: High precision sidearm with low recoil and fast mobility.
 - **AR-15 Assault Rifle**: Balanced automatic fire rate, clip capacity, and medium range.
 - **SG-12 Pump Shotgun**: 8-pellet spread dealing devastating close-range burst damage.
@@ -34,26 +29,26 @@ No installation or node setup required!
 - **SR-50 Heavy Sniper Rifle**: High-caliber precision rifle featuring a target-tracking laser sight line and one-shot kill power.
 - **Plasma Rocket Launcher**: Heavy ordinance firing explosive plasma rounds with radial splash damage.
 
-### 2. 🤖 Bot AI & Difficulty Scaling
+ 2.  Bot AI & Difficulty Scaling
 - **Finite State Machine (FSM)**: Autonomous bot decision tree handling patrolling, target acquisition, cover seeking, flanking, low-health retreat to health spawners, and reloading.
 - **4 Bot Roles**:
-  - 🏃 **Scout**: High mobility, aggressive flanking with SMG.
-  - 🎖️ **Soldier**: Balanced cover-oriented assault rifle combatant.
-  - 🛡️ **Heavy**: High HP tank wielding Shotguns/Rockets.
-  - 🎯 **Sniper**: Long-distance marksman utilizing laser sight tracking.
+  -  **Scout**: High mobility, aggressive flanking with SMG.
+  -  **Soldier**: Balanced cover-oriented assault rifle combatant.
+  -  **Heavy**: High HP tank wielding Shotguns/Rockets.
+  -  **Sniper**: Long-distance marksman utilizing laser sight tracking.
 - **4 Difficulty Levels**:
   - `Rookie` (Easy): Slower reaction (~450ms), wide aim spread, low speed.
   - `Veteran` (Medium): Balanced combat reaction (~220ms), cover-seeking.
   - `Elite` (Hard): Rapid reaction (~90ms), high accuracy, aggressive flanking.
   - `Nightmare`: Lethal pinpoint accuracy (~25ms reaction), aggressive rushes.
 
-### 3. 🗺️ Maps & Dynamic Environments
+ 3.  Maps & Dynamic Environments
 - **Industrial Complex**: Narrow corridors, metal crates, explosive fuel barrels.
 - **Cyber Neon Arena**: Symmetrical crossfire zones, reflective barriers, fast skirmishes.
 - **Desert Outpost**: Sandbag bunkers, shipping containers, wide sniper sightlines.
 - **Dynamic Interactive Objects**: Explosive fuel barrels explode when shot, dealing radial area-of-effect damage; health (+40 HP), armor (+50 Shield), and ammo spawners periodically respawn.
 
-### 4. 🎨 Hand-Crafted Visual Juice & Aesthetics
+4.  Hand-Crafted Visual Juice & Aesthetics
 - **Detailed Character Avatars**: Players and bots feature tactical helmets with glowing visors, body armor plates, and dual hands holding realistic weapon sprites.
 - **Recoil Impulse Physics**: Character sprites physically kick back when firing heavy weapons.
 - **Persistent Floor Decals**: Blood splatters, bullet impacts, and blast scorches stick permanently to map floor tiles throughout the match.
@@ -62,12 +57,12 @@ No installation or node setup required!
 - **Multi-Killstreak Announcer**: Animated popups (`DOUBLE KILL!`, `TRIPLE KILL!`, `RAMPAGE!`, `UNSTOPPABLE!`) with triumphant chord chimes.
 - **Vision Cone Lighting**: Soft ambient darkness with a flashlight vision cone surrounding the player.
 
-### 5. 🔊 Procedural Web Audio Synthesizer
+ 5.  Procedural Web Audio Synthesizer
 - Generates procedural gunshots, reload mechanical clicks, shell casing drops, hitmarkers, kill cues, low health heartbeat pulses, and explosions using the browser's Web Audio API **without requiring external `.mp3` or `.wav` files**.
 
 ---
 
-## 🎮 Game Controls
+ Game Controls
 
 | Key | Action |
 | --- | --- |
@@ -83,7 +78,7 @@ No installation or node setup required!
 
 ---
 
-## 📁 Project File Structure
+ Project File Structure
 
 ```
 2d-action-shooter/
@@ -98,7 +93,7 @@ No installation or node setup required!
 
 ---
 
-## 🛠️ Customization & Hacking
+ Customization & Hacking
 
 You can easily tweak weapon stats or game parameters inside `game.js`:
 
@@ -129,8 +124,4 @@ const configs = {
 };
 ```
 
----
 
-## 📜 License
-
-Distributed under the MIT License. Feel free to use, modify, and distribute for personal or commercial projects.
