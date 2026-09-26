@@ -1,0 +1,434 @@
+/* CYBER STRIKE 2D - MAP ENGINE & ENVIRONMENT GENERATOR */
+
+class GameMap {
+    constructor(mapType = 'industrial') {
+        this.type = mapType;
+        this.width = 2400;
+        this.height = 2400;
+        this.tileSize = 60;
+        this.walls = [];
+        this.barrels = [];
+        this.pickups = [];
+        this.decals = []; // Persistent Blood Stains & Scorch Marks
+        this.spawnsBlue = [];
+        this.spawnsRed = [];
+        this.spawnsFFA = [];
+        
+        this.generateMap(mapType);
+    }
+
+    generateMap(mapType) {
+        this.walls = [];
+        this.barrels = [];
+        this.pickups = [];
+        this.decals = [];
+        this.spawnsBlue = [];
+        this.spawnsRed = [];
+        this.spawnsFFA = [];
+
+        const W = this.width;
+        const H = this.height;
+
+        // Outer Boundary Walls (4 outer walls)
+        const wallThick = 60;
+        this.walls.push({ x: 0, y: 0, w: W, h: wallThick, color: '#1e293b' });
+        this.walls.push({ x: 0, y: H - wallThick, w: W, h: wallThick, color: '#1e293b' });
+        this.walls.push({ x: 0, y: 0, w: wallThick, h: H, color: '#1e293b' });
+        this.walls.push({ x: W - wallThick, y: 0, w: wallThick, h: H, color: '#1e293b' });
+
+        if (mapType === 'industrial') {
+            this.generateIndustrialLayout(W, H);
+        } else if (mapType === 'cyber') {
+            this.generateCyberLayout(W, H);
+        } else {
+            this.generateDesertLayout(W, H);
+        }
+
+        this.generatePickupSpawners();
+    }
+
+    generateIndustrialLayout(W, H) {
+        // Central Compound
+        this.walls.push({ x: 800, y: 700, w: 800, h: 60, color: '#334155' });
+        this.walls.push({ x: 800, y: 1640, w: 800, h: 60, color: '#334155' });
+        this.walls.push({ x: 700, y: 800, w: 60, h: 800, color: '#334155' });
+        this.walls.push({ x: 1640, y: 800, w: 60, h: 800, color: '#334155' });
+
+        // Center Obstacles
+        this.walls.push({ x: 1050, y: 1050, w: 300, h: 300, color: '#475569' });
+
+        // Outer Corridors / Rooms
+        this.walls.push({ x: 300, y: 300, w: 400, h: 80, color: '#334155' });
+        this.walls.push({ x: 300, y: 300, w: 80, h: 400, color: '#334155' });
+
+        this.walls.push({ x: 1700, y: 300, w: 400, h: 80, color: '#334155' });
+        this.walls.push({ x: 2020, y: 300, w: 80, h: 400, color: '#334155' });
+
+        this.walls.push({ x: 300, y: 2020, w: 400, h: 80, color: '#334155' });
+        this.walls.push({ x: 300, y: 1700, w: 80, h: 400, color: '#334155' });
+
+        this.walls.push({ x: 1700, y: 2020, w: 400, h: 80, color: '#334155' });
+        this.walls.push({ x: 2020, y: 1700, w: 80, h: 400, color: '#334155' });
+
+        // Mid-lane Cover Blocks
+        this.walls.push({ x: 1100, y: 400, w: 200, h: 100, color: '#475569' });
+        this.walls.push({ x: 1100, y: 1900, w: 200, h: 100, color: '#475569' });
+        this.walls.push({ x: 400, y: 1100, w: 100, h: 200, color: '#475569' });
+        this.walls.push({ x: 1900, y: 1100, w: 100, h: 200, color: '#475569' });
+
+        // Explosive Barrels Cluster
+        const barrelCoords = [
+            { x: 950, y: 650 }, { x: 1450, y: 650 },
+            { x: 950, y: 1750 }, { x: 1450, y: 1750 },
+            { x: 650, y: 950 }, { x: 650, y: 1450 },
+            { x: 1750, y: 950 }, { x: 1750, y: 1450 },
+            { x: 1200, y: 900 }, { x: 1200, y: 1500 }
+        ];
+
+        barrelCoords.forEach(c => {
+            this.barrels.push({
+                x: c.x, y: c.y, radius: 22, hp: 35, maxHp: 35, exploded: false, flashTimer: 0
+            });
+        });
+
+        // Spawn Points
+        this.spawnsBlue = [{ x: 200, y: 200 }, { x: 350, y: 180 }, { x: 180, y: 350 }, { x: 400, y: 400 }];
+        this.spawnsRed = [{ x: 2200, y: 2200 }, { x: 2050, y: 2220 }, { x: 2220, y: 2050 }, { x: 2000, y: 2000 }];
+        this.spawnsFFA = [
+            { x: 200, y: 200 }, { x: 2200, y: 2200 }, { x: 2200, y: 200 }, { x: 200, y: 2200 },
+            { x: 1200, y: 200 }, { x: 1200, y: 2200 }, { x: 200, y: 1200 }, { x: 2200, y: 1200 }
+        ];
+    }
+
+    generateCyberLayout(W, H) {
+        this.walls.push({ x: 900, y: 900, w: 600, h: 60, color: '#0f3460' });
+        this.walls.push({ x: 900, y: 1440, w: 600, h: 60, color: '#0f3460' });
+        this.walls.push({ x: 900, y: 960, w: 60, h: 480, color: '#0f3460' });
+        this.walls.push({ x: 1440, y: 960, w: 60, h: 480, color: '#0f3460' });
+
+        const pillars = [
+            { x: 500, y: 500 }, { x: 1900, y: 500 }, { x: 500, y: 1900 }, { x: 1900, y: 1900 },
+            { x: 1200, y: 500 }, { x: 1200, y: 1900 }, { x: 500, y: 1200 }, { x: 1900, y: 1200 }
+        ];
+
+        pillars.forEach(p => {
+            this.walls.push({ x: p.x - 60, y: p.y - 60, w: 120, h: 120, color: '#e94560' });
+        });
+
+        [
+            { x: 1200, y: 750 }, { x: 1200, y: 1650 },
+            { x: 750, y: 1200 }, { x: 1650, y: 1200 }
+        ].forEach(c => {
+            this.barrels.push({ x: c.x, y: c.y, radius: 22, hp: 35, maxHp: 35, exploded: false, flashTimer: 0 });
+        });
+
+        this.spawnsBlue = [{ x: 300, y: 1200 }, { x: 300, y: 1000 }, { x: 300, y: 1400 }];
+        this.spawnsRed = [{ x: 2100, y: 1200 }, { x: 2100, y: 1000 }, { x: 2100, y: 1400 }];
+        this.spawnsFFA = [
+            { x: 300, y: 300 }, { x: 2100, y: 300 }, { x: 2100, y: 2100 }, { x: 300, y: 2100 },
+            { x: 1200, y: 300 }, { x: 1200, y: 2100 }
+        ];
+    }
+
+    generateDesertLayout(W, H) {
+        const containers = [
+            { x: 600, y: 600, w: 300, h: 120, color: '#78350f' },
+            { x: 1500, y: 600, w: 300, h: 120, color: '#78350f' },
+            { x: 600, y: 1680, w: 300, h: 120, color: '#78350f' },
+            { x: 1500, y: 1680, w: 300, h: 120, color: '#78350f' },
+
+            { x: 1100, y: 1000, w: 200, h: 400, color: '#92400e' },
+            { x: 400, y: 1100, w: 120, h: 200, color: '#b45309' },
+            { x: 1880, y: 1100, w: 120, h: 200, color: '#b45309' }
+        ];
+
+        containers.forEach(c => this.walls.push(c));
+
+        [
+            { x: 920, y: 660 }, { x: 1480, y: 660 },
+            { x: 920, y: 1740 }, { x: 1480, y: 1740 },
+            { x: 1200, y: 850 }, { x: 1200, y: 1550 }
+        ].forEach(c => {
+            this.barrels.push({ x: c.x, y: c.y, radius: 22, hp: 35, maxHp: 35, exploded: false, flashTimer: 0 });
+        });
+
+        this.spawnsBlue = [{ x: 250, y: 250 }, { x: 450, y: 250 }, { x: 250, y: 450 }];
+        this.spawnsRed = [{ x: 2150, y: 2150 }, { x: 1950, y: 2150 }, { x: 2150, y: 1950 }];
+        this.spawnsFFA = [
+            { x: 250, y: 250 }, { x: 2150, y: 2150 }, { x: 2150, y: 250 }, { x: 250, y: 2150 },
+            { x: 1200, y: 250 }, { x: 1200, y: 2150 }
+        ];
+    }
+
+    generatePickupSpawners() {
+        const spawnerLocations = [
+            { x: 1200, y: 1200, type: 'health' },
+            { x: 600, y: 1200, type: 'ammo' },
+            { x: 1800, y: 1200, type: 'ammo' },
+            { x: 1200, y: 600, type: 'armor' },
+            { x: 1200, y: 1800, type: 'armor' },
+            { x: 400, y: 400, type: 'weapon_sniper' },
+            { x: 2000, y: 2000, type: 'weapon_rocket' }
+        ];
+
+        this.pickups = spawnerLocations.map(loc => ({
+            x: loc.x,
+            y: loc.y,
+            type: loc.type,
+            active: true,
+            respawnTimer: 0,
+            respawnTime: 12000
+        }));
+    }
+
+    addFloorDecal(x, y, type = 'blood', color = '#ef4444') {
+        const checkGore = document.getElementById('toggle-gore');
+        if (checkGore && !checkGore.checked) return;
+
+        // Limit maximum active decals for performance
+        if (this.decals.length > 150) this.decals.shift();
+
+        this.decals.push({
+            x, y,
+            radius: type === 'scorch' ? (20 + Math.random() * 30) : (6 + Math.random() * 12),
+            color: type === 'scorch' ? '#18181b' : color,
+            rot: Math.random() * Math.PI * 2,
+            type
+        });
+    }
+
+    update(dt) {
+        this.pickups.forEach(p => {
+            if (!p.active) {
+                p.respawnTimer += dt;
+                if (p.respawnTimer >= p.respawnTime) {
+                    p.active = true;
+                    p.respawnTimer = 0;
+                }
+            }
+        });
+
+        this.barrels.forEach(b => {
+            if (b.flashTimer > 0) b.flashTimer -= dt;
+        });
+    }
+
+    checkCircleWallCollision(circleX, circleY, radius) {
+        for (const wall of this.walls) {
+            const closestX = Math.max(wall.x, Math.min(circleX, wall.x + wall.w));
+            const closestY = Math.max(wall.y, Math.min(circleY, wall.y + wall.h));
+
+            const distX = circleX - closestX;
+            const distY = circleY - closestY;
+            const distanceSquared = (distX * distX) + (distY * distY);
+
+            if (distanceSquared < (radius * radius)) {
+                const distance = Math.sqrt(distanceSquared) || 0.001;
+                const overlap = radius - distance;
+                const nx = distX / distance;
+                const ny = distY / distance;
+
+                return {
+                    collided: true,
+                    resolveX: nx * overlap,
+                    resolveY: ny * overlap,
+                    wall
+                };
+            }
+        }
+        return { collided: false, resolveX: 0, resolveY: 0 };
+    }
+
+    raycastWall(x1, y1, x2, y2) {
+        let closestHit = null;
+        let minDistanceSq = Infinity;
+
+        for (const wall of this.walls) {
+            const hit = this.lineIntersectRect(x1, y1, x2, y2, wall);
+            if (hit) {
+                const distSq = (hit.x - x1) ** 2 + (hit.y - y1) ** 2;
+                if (distSq < minDistanceSq) {
+                    minDistanceSq = distSq;
+                    closestHit = hit;
+                }
+            }
+        }
+        return closestHit;
+    }
+
+    lineIntersectRect(x1, y1, x2, y2, rect) {
+        const lines = [
+            { x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y },
+            { x1: rect.x + rect.w, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
+            { x1: rect.x + rect.w, y1: rect.y + rect.h, x2: rect.x, y2: rect.y + rect.h },
+            { x1: rect.x, y1: rect.y + rect.h, x2: rect.x, y2: rect.y }
+        ];
+
+        let closest = null;
+        let minDistSq = Infinity;
+
+        for (const line of lines) {
+            const pt = this.lineIntersectLine(x1, y1, x2, y2, line.x1, line.y1, line.x2, line.y2);
+            if (pt) {
+                const dSq = (pt.x - x1) ** 2 + (pt.y - y1) ** 2;
+                if (dSq < minDistSq) {
+                    minDistSq = dSq;
+                    closest = pt;
+                }
+            }
+        }
+        return closest;
+    }
+
+    lineIntersectLine(x1, y1, x2, y2, x3, y3, x4, y4) {
+        const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+        if (denom === 0) return null;
+
+        const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+        const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+
+        if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
+            return {
+                x: x1 + ua * (x2 - x1),
+                y: y1 + ua * (y2 - y1)
+            };
+        }
+        return null;
+    }
+
+    // Render Map floor, persistent decals, walls, barrels and pickups
+    draw(ctx, camera) {
+        // Floor Base
+        ctx.fillStyle = this.type === 'industrial' ? '#0f172a' : (this.type === 'cyber' ? '#070b14' : '#1c130c');
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        // Floor Grid Lines
+        ctx.strokeStyle = this.type === 'industrial' ? '#1e293b' : (this.type === 'cyber' ? '#1e293b' : '#2e2016');
+        ctx.lineWidth = 2;
+        const step = 120;
+        ctx.beginPath();
+        for (let x = 0; x <= this.width; x += step) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, this.height);
+        }
+        for (let y = 0; y <= this.height; y += step) {
+            ctx.moveTo(0, y); ctx.lineTo(this.width, y);
+        }
+        ctx.stroke();
+
+        // Render Persistent Floor Decals (Blood Stains & Scorches)
+        for (const d of this.decals) {
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.rotate(d.rot);
+            ctx.fillStyle = d.color;
+            ctx.beginPath();
+            if (d.type === 'scorch') {
+                ctx.arc(0, 0, d.radius, 0, Math.PI * 2);
+            } else {
+                ctx.ellipse(0, 0, d.radius * 1.4, d.radius * 0.7, 0, 0, Math.PI * 2);
+            }
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Draw Wall Shadows & Walls
+        for (const wall of this.walls) {
+            // Wall Drop Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.fillRect(wall.x + 8, wall.y + 8, wall.w, wall.h);
+
+            // Wall Body
+            ctx.fillStyle = wall.color;
+            ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+
+            // Inner Wall Border & Texture Lines
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+        }
+
+        // Draw Explosive Barrels
+        for (const b of this.barrels) {
+            if (b.exploded) continue;
+            ctx.save();
+            ctx.translate(b.x, b.y);
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.arc(4, 4, b.radius, 0, Math.PI * 2); ctx.fill();
+
+            // Barrel Body
+            ctx.fillStyle = b.flashTimer > 0 ? '#ffffff' : '#ef4444';
+            ctx.beginPath();
+            ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Hazard Icon
+            ctx.fillStyle = '#fef08a';
+            ctx.font = 'bold 12px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡', 0, 0);
+
+            ctx.restore();
+        }
+
+        // Draw Pickups
+        for (const p of this.pickups) {
+            if (!p.active) continue;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+
+            const pulse = Math.sin(Date.now() * 0.005) * 4;
+
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 24 + pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            let icon = '❤️';
+            let color = '#ef4444';
+            if (p.type === 'armor') { icon = '🛡️'; color = '#3b82f6'; }
+            if (p.type === 'ammo') { icon = '📦'; color = '#eab308'; }
+            if (p.type.startsWith('weapon')) { icon = '🔫'; color = '#a855f7'; }
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(icon, 0, 0);
+
+            ctx.restore();
+        }
+    }
+
+    // Draw Dynamic Flashlight Vision Lighting Cone around Player
+    drawVisionLighting(ctx, player, canvasW, canvasH) {
+        const fogToggle = document.getElementById('toggle-fog');
+        if (fogToggle && !fogToggle.checked) return;
+        if (!player || !player.alive) return;
+
+        ctx.save();
+        // Darkness Mask Layer
+        const grad = ctx.createRadialGradient(
+            player.x, player.y, 100,
+            player.x, player.y, 900
+        );
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(0.7, 'rgba(4, 7, 14, 0.55)');
+        grad.addColorStop(1, 'rgba(4, 7, 14, 0.92)');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(player.x - canvasW, player.y - canvasH, canvasW * 2, canvasH * 2);
+        ctx.restore();
+    }
+}
