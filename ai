@@ -1,0 +1,330 @@
+/* CYBER STRIKE 2D - BOT AI & DIFFICULTY SYSTEM */
+
+class BotAI {
+        constructor(entity, difficulty = 'medium', role = 'soldier') {
+                this.bot = entity;
+                this.difficulty = difficulty;
+                this.role = role;
+
+                        this.state = 'PATROL';
+                        this.target = null;
+                        this.patrolTarget = { x: 1200, y: 1200 };
+                        this.lastSeenTargetPos = null;
+
+                                this.reactionTimer = 0;
+                                this.rethinkTimer = 0;
+                                this.strafeTimer = 0;
+                                this.strafeDir = 1;
+
+                                        // Apply Difficulty Parameters
+                                        this.applyDifficultyConfig();
+                                        // Apply Role Stats
+                                        this.applyRoleConfig();
+        }
+
+            applyDifficultyConfig() {
+                    const configs = {
+                            easy: {
+                                    aimSpread: 0.35,      // ~20 deg error
+                                    reactionMs: 450,
+                                    aimSpeed: 0.07,
+                                    speedMult: 0.85,
+                                    burstDelayMult: 1.5,
+                                    pickupAwareness: 0.3
+                            },
+                            medium: {
+                                    aimSpread: 0.18,      // ~10 deg error
+                                    reactionMs: 220,
+                                    aimSpeed: 0.15,
+                                    speedMult: 1.0,
+                                    burstDelayMult: 1.0,
+                                    pickupAwareness: 0.6
+                            },
+                            hard: {
+                                    aimSpread: 0.06,      // ~3 deg error
+                                    reactionMs: 90,
+                                    aimSpeed: 0.30,
+                                    speedMult: 1.12,
+                                    burstDelayMult: 0.7,
+                                    pickupAwareness: 0.95
+                            },
+                            nightmare: {
+                                    aimSpread: 0.015,     // ~1 deg pinpoint accuracy
+                                    reactionMs: 25,
+                                    aimSpeed: 0.55,
+                                    speedMult: 1.25,
+                                    burstDelayMult: 0.4,
+                                    pickupAwareness: 1.0
+                            }
+                        };
+
+                                this.config = configs[this.difficulty] || configs.medium;
+                    }
+
+                        applyRoleConfig() {
+                                if (this.role === 'scout') {
+                                        this.bot.maxHealth = 90;
+                                        this.bot.health = 90;
+                                        this.bot.baseSpeed = 290 * this.config.speedMult;
+                                        this.bot.equipWeapon('smg');
+                                } else if (this.role === 'heavy') {
+                                        this.bot.maxHealth = 150;
+                                        this.bot.health = 150;
+                                        this.bot.baseSpeed = 210 * this.config.speedMult;
+                                        this.bot.equipWeapon('shotgun');
+                                } else if (this.role === 'sniper') {
+                                        this.bot.maxHealth = 85;
+                                        this.bot.health = 85;
+                                        this.bot.baseSpeed = 240 * this.config.speedMult;
+                                        this.bot.equipWeapon('sniper');
+                                } else {
+                                        // Soldier
+                                        this.bot.maxHealth = 110;
+                                        this.bot.health = 110;
+                                        this.bot.baseSpeed = 250 * this.config.speedMult;
+                                        this.bot.equipWeapon('ar');
+                                }
+                            }
+
+                                update(dt, gameState) {
+                                        if (!this.bot.alive) return;
+
+                                                this.rethinkTimer += dt;
+                                                if (this.rethinkTimer > 300) {
+                                                        this.rethinkTimer = 0;
+                                                        this.evaluateState(gameState);
+                                                }
+
+                                                        // Execute behavior based on current State
+                                                        switch (this.state) {
+                                                                case 'ENGAGE':
+                                                                        this.executeEngage(dt, gameState);
+                                                                        break;
+                                                                                    case 'FLANK':
+                                                                                            this.executeFlank(dt, gameState);
+                                                                                            break;
+                                                                                                        case 'RETREAT':
+                                                                                                                this.executeRetreat(dt, gameState);
+                                                                                                                break;
+                                                                                                                            case 'RELOAD':
+                                                                                                                                    this.executeReload(dt, gameState);
+                                                                                                                                    break;
+                                                                                                                                                case 'PATROL':
+                                                                                                                                                    default:
+                                                                                                                                                            this.executePatrol(dt, gameState);
+                                                                                                                                                            break;
+                                                        }
+                                                    }
+
+                                                        evaluateState(gameState) {
+                                                                const bot = this.bot;
+
+                                                                        // 1. Check Low Health Retreat
+                                                                        if (bot.health < bot.maxHealth * 0.35) {
+                                                                                const nearestPickup = this.findNearestPickup(gameState, 'health');
+                                                                                if (nearestPickup) {
+                                                                                        this.state = 'RETREAT';
+                                                                                        this.targetPickup = nearestPickup;
+                                                                                        return;
+                                                                                }
+                                                                            }
+
+                                                                                    // 2. Find Closest Visible Enemy
+                                                                                    let closestEnemy = null;
+                                                                                    let minDistSq = Infinity;
+
+                                                                                            const enemies = gameState.entities.filter(e => e.alive && e.team !== bot.team);
+                                                                                            for (const enemy of enemies) {
+                                                                                                    const dx = enemy.x - bot.x;
+                                                                                                    const dy = enemy.y - bot.y;
+                                                                                                    const distSq = dx * dx + dy * dy;
+
+                                                                                                                // Vision Range (1200px) & Line of Sight
+                                                                                                                if (distSq < 1440000) {
+                                                                                                                        const wallHit = gameState.map.raycastWall(bot.x, bot.y, enemy.x, enemy.y);
+                                                                                                                        if (!wallHit) {
+                                                                                                                                if (distSq < minDistSq) {
+                                                                                                                                        minDistSq = distSq;
+                                                                                                                                        closestEnemy = enemy;
+                                                                                                                                }
+                                                                                                                            }
+                                                                                                                        }
+                                                                                                                    }
+
+                                                                                                                            if (closestEnemy) {
+                                                                                                                                    this.target = closestEnemy;
+                                                                                                                                    this.lastSeenTargetPos = { x: closestEnemy.x, y: closest.x, y: closestEnemy.y };
+
+                                                                                                                                                // Decide Engage vs Flank
+                                                                                                                                                if (this.role === 'scout' || Math.random() < 0.35) {
+                                                                                                                                                        this.state = 'FLANK';
+                                                                                                                                                } else {
+                                                                                                                                                        this.state = 'ENGAGE';
+                                                                                                                                                }
+                                                                                                                                            } else {
+                                                                                                                                                    // No visible enemy
+                                                                                                                                                    if (bot.weapon.ammoInClip < bot.weapon.clipSize * 0.4 && bot.weapon.reserveAmmo > 0) {
+                                                                                                                                                            this.state = 'RELOAD';
+                                                                                                                                                    } else if (this.lastSeenTargetPos) {
+                                                                                                                                                            this.patrolTarget = { ...this.lastSeenTargetPos };
+                                                                                                                                                            this.state = 'PATROL';
+                                                                                                                                                    } else {
+                                                                                                                                                            this.state = 'PATROL';
+                                                                                                                                                            this.pickRandomPatrolTarget(gameState);
+                                                                                                                                                    }
+                                                                                                                                                }
+                                                                                                                                            }
+
+                                                                                                                                                executeEngage(dt, gameState) {
+                                                                                                                                                        if (!this.target || !this.target.alive) {
+                                                                                                                                                                this.state = 'PATROL';
+                                                                                                                                                                return;
+                                                                                                                                                        }
+
+                                                                                                                                                                const bot = this.bot;
+                                                                                                                                                                const target = this.target;
+
+                                                                                                                                                                        // Turn towards target smoothly with aim error
+                                                                                                                                                                        const dx = target.x - bot.x;
+                                                                                                                                                                        const dy = target.y - bot.y;
+                                                                                                                                                                        const idealAngle = Math.atan2(dy, dx);
+
+                                                                                                                                                                                // Add difficulty aim error offset
+                                                                                                                                                                                const aimOffset = (Math.sin(Date.now() * 0.003) * this.config.aimSpread);
+                                                                                                                                                                                const targetAngle = idealAngle + aimOffset;
+
+                                                                                                                                                                                        bot.angle = this.lerpAngle(bot.angle, targetAngle, this.config.aimSpeed);
+
+                                                                                                                                                                                                // Lateral Strafe Movement
+                                                                                                                                                                                                this.strafeTimer += dt;
+                                                                                                                                                                                                if (this.strafeTimer > 1500) {
+                                                                                                                                                                                                        this.strafeTimer = 0;
+                                                                                                                                                                                                        this.strafeDir = Math.random() < 0.5 ? 1 : -1;
+                                                                                                                                                                                                }
+
+                                                                                                                                                                                                        const perpX = -Math.sin(bot.angle) * this.strafeDir;
+                                                                                                                                                                                                        const perpY = Math.cos(bot.angle) * this.strafeDir;
+
+                                                                                                                                                                                                                // Keep distance based on role
+                                                                                                                                                                                                                let forwardFactor = 0.5;
+                                                                                                                                                                                                                const dist = Math.hypot(dx, dy);
+                                                                                                                                                                                                                if (this.role === 'heavy' && dist > 250) forwardFactor = 1.0;
+                                                                                                                                                                                                                if (this.role === 'sniper' && dist < 500) forwardFactor = -0.6; // Back up
+
+                                                                                                                                                                                                                        const moveX = Math.cos(bot.angle) * forwardFactor + perpX * 0.8;
+                                                                                                                                                                                                                        const moveY = Math.sin(bot.angle) * forwardFactor + perpY * 0.8;
+
+                                                                                                                                                                                                                                bot.move(moveX, moveY, dt);
+
+                                                                                                                                                                                                                                        // Fire Gun if aligned with target
+                                                                                                                                                                                                                                        const angleDiff = Math.abs(this.normalizeAngle(bot.angle - idealAngle));
+                                                                                                                                                                                                                                        if (angleDiff < 0.35) {
+                                                                                                                                                                                                                                                bot.shoot(gameState);
+                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                    }
+
+                                                                                                                                                                                                                                        executeFlank(dt, gameState) {
+                                                                                                                                                                                                                                                if (!this.target || !this.target.alive) {
+                                                                                                                                                                                                                                                        this.state = 'PATROL';
+                                                                                                                                                                                                                                                        return;
+                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                        const bot = this.bot;
+                                                                                                                                                                                                                                                        const target = this.target;
+
+                                                                                                                                                                                                                                                                const dx = target.x - bot.x;
+                                                                                                                                                                                                                                                                const dy = target.y - bot.y;
+                                                                                                                                                                                                                                                                const idealAngle = Math.atan2(dy, dx);
+
+                                                                                                                                                                                                                                                                        bot.angle = this.lerpAngle(bot.angle, idealAngle, this.config.aimSpeed);
+
+                                                                                                                                                                                                                                                                                // Move perpendicular around cover
+                                                                                                                                                                                                                                                                                const flankAngle = idealAngle + (Math.PI / 2) * this.strafeDir;
+                                                                                                                                                                                                                                                                                const moveX = Math.cos(flankAngle);
+                                                                                                                                                                                                                                                                                const moveY = Math.sin(flankAngle);
+
+                                                                                                                                                                                                                                                                                        bot.move(moveX, moveY, dt);
+                                                                                                                                                                                                                                                                                        bot.shoot(gameState);
+                                                                                                                                                                                                                                            }
+
+                                                                                                                                                                                                                                                executeRetreat(dt, gameState) {
+                                                                                                                                                                                                                                                        const bot = this.bot;
+                                                                                                                                                                                                                                                        if (this.targetPickup && this.targetPickup.active) {
+                                                                                                                                                                                                                                                                const dx = this.targetPickup.x - bot.x;
+                                                                                                                                                                                                                                                                const dy = this.targetPickup.y - bot.y;
+                                                                                                                                                                                                                                                                const dist = Math.hypot(dx, dy);
+
+                                                                                                                                                                                                                                                                            if (dist > 20) {
+                                                                                                                                                                                                                                                                                    bot.angle = Math.atan2(dy, dx);
+                                                                                                                                                                                                                                                                                    bot.move(dx / dist, dy / dist, dt);
+                                                                                                                                                                                                                                                                            } else {
+                                                                                                                                                                                                                                                                                    this.state = 'PATROL';
+                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                        } else {
+                                                                                                                                                                                                                                                                                this.state = 'PATROL';
+                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                    }
+
+                                                                                                                                                                                                                                                                        executeReload(dt, gameState) {
+                                                                                                                                                                                                                                                                                const bot = this.bot;
+                                                                                                                                                                                                                                                                                bot.reload();
+                                                                                                                                                                                                                                                                                // Seek cover while reloading
+                                                                                                                                                                                                                                                                                this.executePatrol(dt, gameState);
+                                                                                                                                                                                                                                                                        }
+
+                                                                                                                                                                                                                                                                            executePatrol(dt, gameState) {
+                                                                                                                                                                                                                                                                                    const bot = this.bot;
+                                                                                                                                                                                                                                                                                    const dx = this.patrolTarget.x - bot.x;
+                                                                                                                                                                                                                                                                                    const dy = this.patrolTarget.y - bot.y;
+                                                                                                                                                                                                                                                                                    const dist = Math.hypot(dx, dy);
+
+                                                                                                                                                                                                                                                                                            if (dist > 40) {
+                                                                                                                                                                                                                                                                                                    bot.angle = this.lerpAngle(bot.angle, Math.atan2(dy, dx), 0.1);
+                                                                                                                                                                                                                                                                                                    bot.move(dx / dist, dy / dist, dt);
+                                                                                                                                                                                                                                                                                            } else {
+                                                                                                                                                                                                                                                                                                    this.pickRandomPatrolTarget(gameState);
+                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                        }
+
+                                                                                                                                                                                                                                                                                            pickRandomPatrolTarget(gameState) {
+                                                                                                                                                                                                                                                                                                    const margin = 300;
+                                                                                                                                                                                                                                                                                                    this.patrolTarget = {
+                                                                                                                                                                                                                                                                                                            x: margin + Math.random() * (gameState.map.width - margin * 2),
+                                                                                                                                                                                                                                                                                                            y: margin + Math.random() * (gameState.map.height - margin * 2)
+                                                                                                                                                                                                                                                                                                    };
+                                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                                    findNearestPickup(gameState, type) {
+                                                                                                                                                                                                                                                                                                            let nearest = null;
+                                                                                                                                                                                                                                                                                                            let minDistSq = Infinity;
+
+                                                                                                                                                                                                                                                                                                                    for (const p of gameState.map.pickups) {
+                                                                                                                                                                                                                                                                                                                            if (p.active && (p.type === type || type === 'any')) {
+                                                                                                                                                                                                                                                                                                                                    const distSq = (p.x - this.bot.x) ** 2 + (p.y - this.bot.y) ** 2;
+                                                                                                                                                                                                                                                                                                                                    if (distSq < minDistSq) {
+                                                                                                                                                                                                                                                                                                                                            minDistSq = distSq;
+                                                                                                                                                                                                                                                                                                                                            nearest = p;
+                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                            return nearest;
+                                                                                                                                                                                                                                                                                                                        }
+
+                                                                                                                                                                                                                                                                                                                            lerpAngle(a, b, t) {
+                                                                                                                                                                                                                                                                                                                                    const diff = this.normalizeAngle(b - a);
+                                                                                                                                                                                                                                                                                                                                    return a + diff * t;
+                                                                                                                                                                                                                                                                                                                            }
+
+                                                                                                                                                                                                                                                                                                                                normalizeAngle(angle) {
+                                                                                                                                                                                                                                                                                                                                        while (angle > Math.PI) angle -= Math.PI * 2;
+                                                                                                                                                                                                                                                                                                                                        while (angle < -Math.PI) angle += Math.PI * 2;
+                                                                                                                                                                                                                                                                                                                                        return angle;
+                                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                }
+                                                                                                                        }
+                            }
+                    }
+        }
+}

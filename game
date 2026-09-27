@@ -1,0 +1,626 @@
+/* CYBER STRIKE 2D - MAIN GAME ENGINE (JUICE & POLISH OVERHAUL) */
+
+// WEAPONS ARSENAL DEFINITIONS
+const WEAPONS = {
+        pistol: {
+                id: 'pistol',
+                name: 'P1-TACTICAL',
+                damage: 28,
+                fireRate: 220,      // ms between shots
+                clipSize: 12,
+                reserveAmmo: 96,
+                reloadTime: 1200,   // ms
+                spread: 0.04,
+                bulletsPerShot: 1,
+                speed: 1600,        // px/shotscolor: '#60a5fa',
+                sound: 'playPistol',
+                shake: 2,
+                laser: false,
+                recoilForce: 4
+        },
+        ar: {
+                id: 'ar',
+                name: 'AR-15 ASSAULT',
+                damage: 24,
+                fireRate: 110,
+                clipSize: 30,
+                reserveAmmo: 180,
+                reloadTime: 1800,
+                spread: 0.08,
+                bulletsPerShot: 1,
+                speed: 1800,
+                color: '#facc15',
+                sound: 'playRifle',
+                shake: 3.5,
+                laser: false,
+                recoilForce: 6
+        },
+        shotgun: {
+                id: 'shotgun',
+                name: 'SG-12 SHOTGUN',
+                damage: 18,        // 18 per pellet * 8 pellets = 144 max point blank
+                fireRate: 850,
+                clipSize: 8,
+                reserveAmmo: 48,
+                reloadTime: 2400,
+                spread: 0.22,
+                bulletsPerShot: 8,
+                speed: 1500,
+                color: '#f97316',
+                sound: 'playShotgun',
+                shake: 9,
+                laser: false,
+                recoilForce: 14
+        },
+        smg: {
+                id: 'smg',
+                name: 'SMG-9 SPECTRUM',
+                damage: 16,
+                fireRate: 75,
+                clipSize: 35,
+                reserveAmmo: 210,
+                reloadTime: 1400,
+                spread: 0.14,
+                bulletsPerShot: 1,
+                speed: 1700,
+                color: '#a855f7',
+                sound: 'playSmg',
+                shake: 2.5,
+                laser: false,
+                recoilForce: 3
+        },
+        sniper: {
+                id: 'sniper',
+                name: 'SR-50 HEAVY SNIPER',
+                damage: 110,        // One-shot kill body hit
+                fireRate: 1300,
+                clipSize: 5,
+                reserveAmmo: 25,
+                reloadTime: 2800,
+                spread: 0.005,
+                bulletsPerShot: 1,
+                speed: 2400,
+                color: '#ef4444',
+                sound: 'playSniper',
+                shake: 14,
+                laser: true,
+                recoilForce: 18
+        },
+        rocket: {
+                id: 'rocket',
+                name: 'PLASMA ROCKET',
+                damage: 150,
+                fireRate: 1500,
+                clipSize: 3,
+                reserveAmmo: 12,
+                reloadTime: 3000,
+                spread: 0.02,
+                bulletsPerShot: 1,
+                speed: 1000,
+                color: '#00f0ff',
+                sound: 'playRocket',
+                shake: 18,
+                isRocket: true,
+                splashRadius: 160,
+                recoilForce: 20
+        }
+};
+
+// ENTITY CLASS (PLAYER & BOTS WITH DETAILED HAND-CRAFTED AVATARS)
+class Entity {
+        constructor(id, name, team, x, y, isPlayer = false) {
+                this.id = id;
+                this.name = name;
+                this.team = team; // 'blue' or 'red'
+                this.x = x;
+                this.y = y;
+                this.radius = 20;
+                this.angle = 0;
+                this.isPlayer = isPlayer;
+
+                        this.maxHealth = 100;
+                        this.health = 100;
+                        this.maxArmor = 50;
+                        this.armor = 50;
+                        this.alive = true;
+                        this.respawnTimer = 0;
+
+                                this.baseSpeed = 250;
+                                this.vx = 0;
+                                this.vy = 0;
+                                this.recoilKick = 0;
+
+                                        // Stamina & Dash
+                                        this.stamina = 100;
+                                        this.maxStamina = 100;
+                                        this.isSprinting = false;
+                                        this.dashCooldown = 0;
+                                        this.dashTimer = 0;
+
+                                                // Footstep animation dashTimerthis.stepTimer = 0;
+
+                                                        // Stats & Multi-Killstreak Tracker
+                                                        this.kills = 0;
+                                                        this.deaths = 0;
+                                                        this.score = 0;
+                                                        this.totalShots = 0;
+                                                        this.totalHits = 0;
+                                                        this.totalDamage = 0;
+                                                        this.recentKills = 0;
+                                                        this.lastKillTime = 0;
+
+                                                                // Inventory
+                                                                this.weapon = { ...WEAPONS.ar, ammoInClip: WEAPONS.ar.clipSize, reserveAmmo: WEAPONS.ar.reserveAmmo };
+                                                                this.inventory = ['pistol', 'ar', 'shotgun', 'smg', 'sniper', 'rocket'];
+                                                                this.lastShotTime = 0;
+                                                                this.isReloading = false;
+                                                                this.reloadStartTime = 0;
+
+                                                                        this.ai = null;
+        }
+
+            equipWeapon(weaponId) {
+                    if (!WEAPONS[weaponId]) return;
+                    const wDef = WEAPONS[weaponId];
+                    this.weapon = {
+                            ...wDef,
+                            ammoInClip: wDef.clipSize,
+                            reserveAmmo: wDef.reserveAmmo        };
+                            this.isReloading = false;
+            }
+
+                move(dx, dy, dt) {
+                        if (!this.alive) return;
+
+                                let speed = this.baseSpeed;
+                                if (this.isSprinting && this.stamina > 0) {
+                                        speed *= 1.4;
+                                        this.stamina = Math.max(0, this.stamina - dt * 0.035);
+                                } else if (!this.isSprinting && this.stamina < this.maxStamina) {
+                                        this.stamina = Math.min(this.maxStamina, this.stamina + dt * 0.02);
+                                }
+
+                                        if (this.dashTimer > 0) {
+                                                speed *= 2.2;
+                                                this.dashTimer -= dt;
+                                        }
+
+                                                const len = Math.hypot(dx, dy);
+                                                if (len > 0) {
+                                                        this.vx = (dx / len) * speed;
+                                                        this.vy = (dy / len) * speed;
+
+                                                                    // Footstep dust dashTimerthis.stepTimer += dt;
+                                                                    if (this.stepTimer > 180) {
+                                                                            this.stepTimer = 0;
+                                                                            if (window.gameInstance) {
+                                                                                    window.gameInstance.particles.spawnDust(this.x, this.y);
+                                                                            }
+                                                                    }
+                                                } else {
+                                                        this.vx = 0;
+                                                        this.vy = 0;
+                                                }
+
+                                                        // Apply recoil pushback decay
+                                                        if (this.recoilKick > 0) {
+                                                                this.recoilKick = Math.max(0, this.recoilKick - dt * 0.05);
+                                                        }
+
+                                                                // Integrate Position
+                                                                this.x += this.vx * (dt / 1000);
+                                                                this.y += this.vy * (dt / 1000);
+
+                                                                        if (this.dashCooldown > 0) this.dashCooldown -= dt;
+                }
+
+                    dash() {
+                            if (this.dashCooldown <= 0 && this.stamina >= 30) {
+                                    this.dashTimer = 200;
+                                    this.dashCooldown = 1500;
+                                    this.stamina -= 30;
+                                    soundManager.playPickup();
+                            }
+                    }
+
+                        reload() {
+                                if (this.isReloading) return;
+                                if (this.weapon.ammoInClip >= this.weapon.clipSize) return;
+                                if (this.weapon.reserveAmmo <= 0) return;
+
+                                        this.isReloading = true;
+                                        this.reloadStartTime = Date.now();
+                                        if (this.isPlayer) soundManager.playReload();
+                        }
+
+                            updateReload() {
+                                    if (!this.isReloading) return;
+
+                                            const elapsed = Date.now() - this.reloadStartTime;
+                                            if (elapsed >= this.weapon.reloadTime) {
+                                                    const needed = this.weapon.clipSize - this.weapon.ammoInClip;
+                                                    const transfer = Math.min(needed, this.weapon.reserveAmmo);
+                                                    this.weapon.ammoInClip += transfer;
+                                                    this.weapon.reserveAmmo -= transfer;
+                                                    this.isReloading = false;
+                                            }
+                            }
+
+                                shoot(gameState) {
+                                        if (!this.alive || this.isReloading) return false;
+
+                                                const now = Date.now();
+                                                if (now - this.lastShotTime < this.weapon.fireRate) return false;
+
+                                                        if (this.weapon.ammoInClip <= 0) {
+                                                                if (this.isPlayer) soundManager.playEmptyClick();
+                                                                this.reload();
+                                                                return false;
+                                                        }
+
+                                                                this.weapon.ammoInClip--;
+                                                                this.lastShotTime = now;
+                                                                this.totalShots++;
+                                                                this.recoilKick = this.weapon.recoilForce || 5;
+
+                                                                        // Trigger Audio & Screen shakeif (this.isPlayer) {
+                                                                                if (soundManager[this.weapon.sound]) soundManager[this.weapon.sound]();
+                                                                                gameState.addCameraShake(this.weapon.shake);
+                                                                        }
+
+                                                                                // Spawn Muzzle Flash
+                                                                                const gunLength = 32;
+                                                                                const barrelX = this.x + Math.cos(this.angle) * gunLength;
+                                                                                const barrelY = this.y + Math.sin(this.angle) * gunLength;
+
+                                                                                        gameState.particles.spawnMuzzleFlash(barrelX, barrelY, this.angle, this.weapon.color);
+                                                                                        gameState.particles.spawnCasing(barrelX, barrelY, this.angle);
+
+                                                                                                // Spawn Projectiles
+                                                                                                for (let i = 0; i < this.weapon.bulletsPerShot; i++) {
+                                                                                                        const spreadAngle = (Math.random() - 0.5) * this.weapon.spread * 2;
+                                                                                                        const projAngle = this.angle + spreadAngle;
+
+                                                                                                                    gameState.projectiles.push({
+                                                                                                                            owner: this,
+                                                                                                                            x: barrelX,
+                                                                                                                            y: barrelY,
+                                                                                                                            vx: Math.cos(projAngle) * this.weapon.speed,
+                                                                                                                            vy: Math.sin(projAngle) * this.weapon.speed,
+                                                                                                                            damage: this.weapon.damage,
+                                                                                                                            color: this.weapon.color,
+                                                                                                                            life: 1.5,
+                                                                                                                            isRocket: !!this.weapon.isRocket,
+                                                                                                                            splashRadius: this.weapon.splashRadius || 0
+                                                                                                });
+                                                                                                }
+                                                                                                
+                                                                                                        return true;
+                                }
+                                
+                                    takeDamage(amount, attacker, gameState) {
+                                            if (!this.alive) return;
+                                            
+                                                    let hpDamage = amount;
+                                                    if (this.armor > 0) {
+                                                            const armorAbsorb = Math.min(this.armor, amount * 0.5);
+                                                            this.armor -= armorAbsorb;
+                                                            hpDamage -= armorAbsorb;
+                                                    }
+                                                    
+                                                            this.health -= hpDamage;
+                                                            
+                                                                    // Spawn Blood Splatter & Floor Decal Staminaconst bloodColor = this.team === 'blue' ? '#00f0ff' : '#ef4444';
+                                                                    gameState.particles.spawnBloodSplatter(this.x, this.y, bloodColor);
+                                                                    gameState.map.addFloorDecal(this.x, this.y, 'blood', bloodColor);
+                                                                    
+                                                                            // Floating Damage Number
+                                                                            const isCrit = amount >= 100;
+                                                                            gameState.spawnFloatingDamage(this.x, this.y, Math.round(amount), isCrit);
+                                                                            
+                                                                                    if (attacker && attacker.isPlayer) {
+                                                                                            soundManager.playHitmark();
+                                                                                            attacker.totalHits++;
+                                                                                            attacker.totalDamage += amount;
+                                                                                            gameState.hitmarkerTime = 150; // Hitmarker X display dashTimer        }
+                                                                                            
+                                                                                                    if (this.isPlayer) {
+                                                                                                            gameState.triggerDamageVignette();
+                                                                                                    }
+                                                                                                    
+                                                                                                            if (this.health <= 0) {
+                                                                                                                    this.die(attacker, gameState);
+                                                                                                            }
+                                    }
+                                    
+                                        die(attacker, gameState) {
+                                                this.alive = false;
+                                                this.health = 0;
+                                                this.deaths++;
+                                                this.respawnTimer = 3500;
+                                                
+                                                        if (attacker) {
+                                                                attacker.kills++;
+                                                                attacker.score += 100;
+                                                                
+                                                                            // Track Multi-Kill Streak (within 3s window)
+                                                                            const now = Date.now();
+                                                                            if (now - attacker.lastKillTime < 3000) {
+                                                                                    attacker.recentKills++;
+                                                                            } else {
+                                                                                    attacker.recentKills = 1;
+                                                                            }
+                                                                            attacker.lastKillTime = now;
+                                                                            
+                                                                                        if (attacker.isPlayer) {
+                                                                                                soundManager.playKill();
+                                                                                                
+                                                                                                                // Multi-kill Announcement
+                                                                                                                if (attacker.recentKills === 2) gameState.triggerStreakBanner('DOUBLE KILL!');
+                                                                                                                if (attacker.recentKills === 3) gameState.triggerStreakBanner('TRIPLE KILL!');
+                                                                                                                if (attacker.recentKills === 4) gameState.triggerStreakBanner('RAMPAGE!');
+                                                                                                                if (attacker.recentKills >= 5) gameState.triggerStreakBanner('UNSTOPPABLE!');
+                                                                                        }
+                                                                                        
+                                                                                                    gameState.addKillfeedEntry(attacker, this, attacker.weapon.name);
+                                                        }
+                                                        
+                                                                // Explosion Debris & Scorch Decal on FloorgameState.particles.spawnExplosion(this.x, this.y, 15, '#ff2a55');
+                                                                gameState.map.addFloorDecal(this.x, this.y, 'scorch');
+                                        }
+                                        
+                                            respawn(spawnPos) {
+                                                    this.x = spawnPos.x;
+                                                    this.y = spawnPos.y;
+                                                    this.health = this.maxHealth;
+                                                    this.armor = this.maxArmor;
+                                                    this.stamina = this.maxStamina;
+                                                    this.alive = true;
+                                                    this.isReloading = false;
+                                                    this.weapon.ammoInClip = this.weapon.clipSize;
+                                                    this.weapon.reserveAmmo = this.weapon.reserveAmmo;
+                                            }
+                                            
+                                                // HAND-CRAFTED CHARACTER SPRITE DRAWING (AVATAR WITH HANDS & DETAILED GUNS)
+                                                draw(ctx, camera) {
+                                                        if (!this.alive) return;
+                                                        
+                                                                ctx.save();
+                                                                // Calculate recoil offset kickback Positionconst renderX = this.x - Math.cos(this.angle) * this.recoilKick;
+                                                                const renderY = this.y - Math.sin(this.angle) * this.recoilKick;
+                                                                
+                                                                        ctx.translate(renderX, renderY);
+                                                                        ctx.rotate(this.angle);
+                                                                        
+                                                                                // 1. Character Soft Shadowctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                                                                                ctx.beginPath();
+                                                                                ctx.ellipse(2, 4, 18, 14, 0, 0, Math.PI * 2);
+                                                                                ctx.fill();
+                                                                                
+                                                                                        // 2. Main Body Suit & Tactical Armor playEmptyClickctx.fillStyle = this.team === 'blue' ? '#0055cc' : '#cc0033';
+                                                                                        ctx.beginPath();
+                                                                                        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                                                                                        ctx.fill();
+                                                                                        
+                                                                                                // Body Armor Vest Outlines
+                                                                                                ctx.fillStyle = '#1e293b';
+                                                                                                ctx.fillRect(-8, -12, 16, 24);
+                                                                                                
+                                                                                                        // Armor Chest Accent
+                                                                                                        ctx.fillStyle = this.team === 'blue' ? '#00f0ff' : '#ff4466';
+                                                                                                        ctx.fillRect(-4, -8, 8, 16);
+                                                                                                        
+                                                                                                                // 3. Detailed Weapon Rendering & Dual Hands Holding gunLengththis.drawDetailedWeapon(ctx);
+                                                                                                                
+                                                                                                                        // 4. Tactical Helmet & Visor
+                                                                                                                        ctx.fillStyle = '#0f172a';
+                                                                                                                        ctx.beginPath();
+                                                                                                                        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+                                                                                                                        ctx.fill();
+                                                                                                                        
+                                                                                                                                // Helmet Outlinesctx.strokeStyle = this.isPlayer ? '#00f0ff' : '#ffffff';
+                                                                                                                                ctx.lineWidth = this.isPlayer ? 3 : 1.5;
+                                                                                                                                ctx.stroke();
+                                                                                                                                
+                                                                                                                                        // Glowing Visor lineWidthctx.fillStyle = this.isPlayer ? '#00f0ff' : (this.team === 'blue' ? '#38bdf8' : '#f87171');
+                                                                                                                                        ctx.fillRect(4, -5, 6, 10);
+                                                                                                                                        
+                                                                                                                                                ctx.restore();
+                                                                                                                                                
+                                                                                                                                                        // 5. Laser Sight Line for Heavy sniperif (this.weapon.laser && this.alive) {
+                                                                                                                                                                const endX = this.x + Math.cos(this.angle) * 900;
+                                                                                                                                                                const endY = this.y + Math.sin(this.angle) * 900;
+                                                                                                                                                                
+                                                                                                                                                                            const wallHit = camera.map.raycastWall(this.x, this.y, endX, endY);
+                                                                                                                                                                            const targetX = wallHit ? wallHit.x : endX;
+                                                                                                                                                                            const targetY = wallHit ? wallHit.y : endY;
+                                                                                                                                                                            
+                                                                                                                                                                                        ctx.strokeStyle = 'rgba(255, 42, 85, 0.65)';
+                                                                                                                                                                                        ctx.lineWidth = 1.5;
+                                                                                                                                                                                        ctx.beginPath();
+                                                                                                                                                                                        ctx.moveTo(this.x, this.y);
+                                                                                                                                                                                        ctx.lineTo(targetX, targetY);
+                                                                                                                                                                                        ctx.stroke();
+                                                                                                                                                        }
+                                                                                                                                                        
+                                                                                                                                                                // Overhead Health barrelXif (this.health < this.maxHealth) {
+                                                                                                                                                                        const barW = 44;
+                                                                                                                                                                        const barH = 5;
+                                                                                                                                                                        const barX = this.x - barW / 2;
+                                                                                                                                                                        const barY = this.y - 32;
+                                                                                                                                                                        
+                                                                                                                                                                                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                                                                                                                                                                                    ctx.fillRect(barX, barY, barW, barH);
+                                                                                                                                                                                    
+                                                                                                                                                                                                const hpPct = Math.max(0, this.health / this.maxHealth);
+                                                                                                                                                                                                ctx.fillStyle = this.team === 'blue' ? '#00f0ff' : '#ff2a55';
+                                                                                                                                                                                                ctx.fillRect(barX, barY, barW * hpPct, barH);
+                                                                                                                                                                }
+                                                                                                                                                                
+                                                                                                                                                                        // Entity Name targetXctx.fillStyle = '#ffffff';
+                                                                                                                                                                        ctx.font = 'bold 11px Orbitron';
+                                                                                                                                                                        ctx.textAlign = 'center';
+                                                                                                                                                                        ctx.fillText(this.name, this.x, this.y - 38);
+                                                }
+                                                
+                                                    drawDetailedWeapon(ctx) {
+                                                            const wId = this.weapon.id;
+                                                            
+                                                                    // Left Hand & Right Hand Colors
+                                                                    const handColor = '#fbcfe8'; // Skin tone gloves
+                                                                    
+                                                                            if (wId === 'pistol') {
+                                                                                    // Pistol Gun Barrel & spawnFloatingDamagectx.fillStyle = '#334155';
+                                                                                    ctx.fillRect(8, -3, 16, 6);
+                                                                                    ctx.fillStyle = '#0f172a';
+                                                                                    ctx.fillRect(16, -2, 6, 4);
+                                                                                    
+                                                                                                // Hands holding pistolctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(10, -5, 4, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(10, 5, 4, 0, Math.PI * 2); ctx.fill();
+                                                                            } else if (wId === 'ar') {
+                                                                                    // Assault Rifle Barrel, Magazine, Stock
+                                                                                    ctx.fillStyle = '#1e293b';
+                                                                                    ctx.fillRect(6, -4, 28, 8);
+                                                                                    ctx.fillStyle = '#facc15'; // Curved mag Accentctx.fillRect(14, 4, 6, 7);
+                                                                                    ctx.fillStyle = '#475569';
+                                                                                    ctx.fillRect(28, -2, 8, 4);
+                                                                                    
+                                                                                                // Dual Handsctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(8, -6, 4, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(22, 5, 4, 0, Math.PI * 2); ctx.fill();
+                                                                            } else if (wId === 'shotgun') {
+                                                                                    // Pump Shotgun Heavy Barrel & Gripctx.fillStyle = '#334155';
+                                                                                    ctx.fillRect(6, -5, 26, 10);
+                                                                                    ctx.fillStyle = '#f97316'; // Pump Gripctxctx.fillRect(16, -6, 8, 12);
+                                                                                    
+                                                                                                // Dual Handsctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(8, -6, 4.5, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(20, 6, 4.5, 0, Math.PI * 2); ctx.fill();
+                                                                            } else if (wId === 'smg') {
+                                                                                    // Compact smgctx.fillStyle = '#1e293b';
+                                                                                    ctx.fillRect(6, -4, 20, 8);
+                                                                                    ctx.fillStyle = '#a855f7';
+                                                                                    ctx.fillRect(12, 4, 4, 8);
+                                                                                    
+                                                                                                ctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(8, -5, 4, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(16, 5, 4, 0, Math.PI * 2); ctx.fill();
+                                                                            } else if (wId === 'sniper') {
+                                                                                    // Heavy Sniper Long Barrel & Dual Scope
+                                                                                    ctx.fillStyle = '#0f172a';
+                                                                                    ctx.fillRect(6, -4, 38, 8);
+                                                                                    ctx.fillStyle = '#ef4444'; // Scope Rings
+                                                                                    ctx.fillRect(16, -7, 10, 3);
+                                                                                    
+                                                                                                ctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(8, -6, 4, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(26, 6, 4, 0, Math.PI * 2); ctx.fill();
+                                                                            } else {
+                                                                                    // Rocket Launcher Tube
+                                                                                    ctx.fillStyle = '#1e293b';
+                                                                                    ctx.fillRect(4, -7, 32, 14);
+                                                                                    ctx.fillStyle = '#00f0ff'; // Warhead Front TRIPLEctx.fillRect(30, -6, 8, 12);
+                                                                                    
+                                                                                                ctx.fillStyle = handColor;
+                                                                                                ctx.beginPath(); ctx.arc(10, -8, 5, 0, Math.PI * 2); ctx.fill();
+                                                                                                ctx.beginPath(); ctx.arc(22, 8, 5, 0, Math.PI * 2); ctx.fill();
+                                                                            }
+                                                    }
+}
+
+// PARTICLE ENGINE WITH FLOATING DAMAGE NUMBERS & dustclass ParticleEngine {
+        constructor() {
+                this.particles = [];
+        }
+        
+            spawnMuzzleFlash(x, y, angle, color) {
+                    this.particles.push({
+                            type: 'muzzle',
+                            x, y, angle, color,
+                            life: 0.05, maxLife: 0.05
+            });
+            }
+            
+                spawnCasing(x, y, angle) {
+                        const perp = angle + Math.PI / 2;
+                        this.particles.push({
+                                type: 'casing',
+                                x, y,
+                                vx: Math.cos(perp) * (80 + Math.random() * 40),
+                                vy: Math.sin(perp) * (80 + Math.random() * 40),
+                                rot: Math.random() * Math.PI * 2,
+                                vRot: (Math.random() - 0.5) * 10,
+                                life: 0.4, maxLife: 0.4
+                });
+                }
+                
+                    spawnBloodSplatter(x, y, color) {
+                            for (let i = 0; i < 8; i++) {
+                                    const angle = Math.random() * Math.PI * 2;
+                                    const speed = 40 + Math.random() * 120;
+                                    this.particles.push({
+                                            type: 'spark',
+                                            x, y,
+                                            vx: Math.cos(angle) * speed,
+                                            vy: Math.sin(angle) * speed,
+                                            size: 2 + Math.random() * 3,
+                                            color,
+                                            life: 0.3, maxLife: 0.3
+                            });
+                            }
+                    }
+                    
+                        spawnDust(x, y) {
+                                this.particles.push({
+                                        type: 'dust',
+                                        x, y,
+                                        vx: (Math.random() - 0.5) * 20,
+                                        vy: (Math.random() - 0.5) * 20,
+                                        size: 3 + Math.random() * 5,
+                                        color: 'rgba(255, 255, 255, 0.25)',
+                                        life: 0.25, maxLife: 0.25
+                        });
+                        }
+                        
+                            spawnExplosion(x, y, radius, color = '#ef4444') {
+                                    for (let i = 0; i < 30; i++) {
+                                            const angle = Math.random() * Math.PI * 2;
+                                            const speed = 50 + Math.random() * 250;
+                                            this.particles.push({
+                                                    type: 'smoke',
+                                                    x, y,
+                                                    vx: Math.cos(angle) * speed,
+                                                    vy: Math.sin(angle) * speed,
+                                                    size: 6 + Math.random() * 14,
+                                                    color: i % 2 === 0 ? color : '#f97316',
+                                                    life: 0.6, maxLife: 0.6
+                                    });
+                                    }
+                            }
+                            
+                                update(dt) {
+                                        for (let i = this.particles.length - 1; i >= 0; i--) {
+                                                const p = this.particles[i];
+                                                p.life -= dt / 1000;
+                                                
+                                                            if (p.life <= 0) {
+                                                                    this.particles.splice(i, 1);
+                                                                    continue;
+                                                            }
+                                                            
+                                                                        if (p.vx) p.x += p.vx * (dt / 1000);
+                                                                        if (p.vy) p.y += p.vy * (dt / 1000);
+                                                                        if (p.vRot) p.rot += p.vRot * (dt / 1000);
+                                        }
+                                }
+                                
+                                    draw(ctx) {
+                                            for (const p of this.particles) {
+                                                    ctx.save();
+                                                    const alpha = Math.max(0, p.life / p.maxLife);)
+                                                                            }
+                                                                    }
+                    }
+        }
+}
